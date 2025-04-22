@@ -8,8 +8,29 @@ import {
   SendMessageOptions
   // eslint-disable-next-line import/no-unresolved
 } from 'chatgpt'
+
 import pRetry from 'p-retry'
 import {OpenAIOptions, Options} from './options'
+
+// モンキーパッチを適用
+const originalSendMessage = ChatGPTAPI.prototype.sendMessage
+ChatGPTAPI.prototype.sendMessage = async function (text, opts = {}) {
+  // オプションをディープコピー
+  const modifiedOpts = JSON.parse(JSON.stringify(opts))
+
+  // completionParamsのmodelプロパティをチェック
+  if (modifiedOpts.completionParams?.model?.startsWith('o3')) {
+    // max_tokensが存在する場合、max_completion_tokensに変換
+    if (modifiedOpts.completionParams.max_tokens) {
+      // eslint-disable-next-line prettier/prettier, camelcase
+      (modifiedOpts.completionParams as any).max_completion_tokens = modifiedOpts.completionParams.max_tokens
+      delete modifiedOpts.completionParams.max_tokens
+    }
+  }
+
+  // 元のメソッドを呼び出し
+  return originalSendMessage.call(this, text, modifiedOpts)
+}
 
 // define type to save parentMessageId and conversationId
 export interface Ids {
